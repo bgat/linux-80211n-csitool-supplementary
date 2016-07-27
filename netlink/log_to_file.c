@@ -8,6 +8,8 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
+#include <time.h>
+#include <limits.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <linux/netlink.h>
@@ -20,7 +22,7 @@ FILE* out = NULL;
 
 void check_usage(int argc, char** argv);
 
-FILE* open_file(char* filename, char* spec);
+FILE* open_file(char* filename, char* spec, FILE *orig);
 
 void caught_signal(int sig);
 
@@ -36,12 +38,10 @@ int main(int argc, char** argv)
 	int ret;
 	unsigned short l, l2;
 	int count = 0;
+	time_t tnow = 0, tprev = 0;
 
 	/* Make sure usage is correct */
 	check_usage(argc, argv);
-
-	/* Open and check log file */
-	out = open_file(argv[1], "w");
 
 	/* Setup the socket */
 	sock_fd = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_CONNECTOR);
@@ -76,6 +76,13 @@ int main(int argc, char** argv)
 	/* Poll socket forever waiting for a message */
 	while (1)
 	{
+		/* clip output files every thirty seconds */
+		tnow = time(NULL);
+		if (tnow - tprev > 30) {
+			out = open_file(argv[1], "w", out);
+			tprev = tnow;
+		}
+
 		/* Receive from socket with infinite timeout */
 		ret = recv(sock_fd, buf, sizeof(buf), 0);
 		if (ret == -1)
@@ -105,13 +112,32 @@ void check_usage(int argc, char** argv)
 	if (argc != 2)
 	{
 		fprintf(stderr, "Usage: %s <output_file>\n", argv[0]);
+		fprintf(stderr, "Writes channel information to <output_file>-<timestamp>.csitool\n");
 		exit_program(1);
 	}
 }
 
-FILE* open_file(char* filename, char* spec)
+FILE* open_file(char* filename, char* spec, FILE *orig)
 {
-	FILE* fp = fopen(filename, spec);
+	char buf[PATH_MAX];
+	int len;
+	FILE* fp;
+
+	/* if the user provided a filename extension, don't "rotate" the log file */
+	if (strchr(filename, '.')) {
+		if (orig)
+			return orig;
+		strcpy(buf, filename);
+		goto do_open;
+	}
+
+	/* the user provided a filename template; add timestamp and extension */
+	len = snprintf(buf, sizeof buf, "%s-%zu.csitool", filename, time(NULL));
+	if (len >= sizeof buf)
+		return NULL;
+
+do_open:
+	fp = fopen(buf, spec == NULL ? "w" : spec);
 	if (!fp)
 	{
 		perror("fopen");
