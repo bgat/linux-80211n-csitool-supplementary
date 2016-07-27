@@ -5,3 +5,9 @@
 
 override_dh_auto_build:
 	$(MAKE) -C netlink
+
+override_dh_auto_install:
+	$(MAKE) -C netlink install
+
+override_dh_auto_clean:
+	$(MAKE) -C netlink clean
