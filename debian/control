@@ -6,7 +6,7 @@ Build-Depends: debhelper (>= 9)
 Standards-Version: 3.9.5
 
 Package: linux-80211n-csitool-supplementary
-Architecture: all
+Architecture: amd64
 Depends: ${misc:Depends}
 Description: linux-80211n-csitool-supplementary apps
  Executable artifacts from linux-80211n-csitool-supplementary
